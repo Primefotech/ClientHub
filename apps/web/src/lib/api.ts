@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://72.61.172.138:3001/api/v1';
 
 // Track if a 401 redirect is already in progress to avoid loops
 let redirecting401 = false;

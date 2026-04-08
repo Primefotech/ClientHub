@@ -21,7 +21,7 @@ COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
 
 # Build Next.js
-# Catch build arguments and set them as ENV for Webpack to inline
+# Ensure NEXT_PUBLIC_API_URL and NEXT_PUBLIC_WS_URL are available for build-time inlining
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL

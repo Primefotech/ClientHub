@@ -30,27 +30,21 @@ This document provides instructions for deploying the BrandBook Client OS to a p
 
 ## Deployment Steps
 
-### Docker Deployment (Recommended)
-
-The easiest way to deploy is using the provided `docker-compose.yml` which orchestrates the entire stack.
-
-**1. Prepare Environment**
-Create a `.env` file in the root based on `.env.example`.
-
-**2. Build and Start**
-Because Next.js inlines `NEXT_PUBLIC_` variables at build-time, you **must** use the following command when your IP or domain changes:
-```bash
-docker compose build --no-cache web
-docker compose up -d
-```
-
-**Note on Storage**: The stack includes an `init-minio` container that automatically creates the `brandbook-files` bucket and sets it to public.
-
-### Manual Monorepo Build
-If you are not using Docker:
+### 1. Build the Monorepo
+Run this from the root directory:
 ```bash
 npm run build
+```
+
+### 2. Run Migrations
+Ensure the database is up to date:
+```bash
 npm run db:migrate
+```
+
+### 3. Start the Application
+Use a process manager like PM2 or run via root:
+```bash
 npm run start
 ```
 
