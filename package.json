@@ -13,9 +13,7 @@
     "db:generate": "npm run db:generate --workspace=apps/api",
     "db:migrate": "npm run db:migrate --workspace=apps/api",
     "db:seed": "npm run db:seed --workspace=apps/api",
-    "db:studio": "npm run db:studio --workspace=apps/api",
-    "start": "concurrently \"npm run start --workspace=apps/api\" \"npm run start --workspace=apps/web\"",
-    "postinstall": "npm run db:generate --workspace=@brandbook/api"
+    "db:studio": "npm run db:studio --workspace=apps/api"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

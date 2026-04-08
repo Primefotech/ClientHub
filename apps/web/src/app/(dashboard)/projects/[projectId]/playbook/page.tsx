@@ -8,7 +8,7 @@ import { playbooksApi } from '@/lib/api';
 
 export default function ProjectPlaybookPage({ params }: { params: { projectId: string } }) {
   const { user } = useAuth();
-  const isClient = user?.role === 'CLIENT_OWNER' || user?.role === 'CLIENT_STAFF';
+  const isClient = user?.role === 'CLIENT_OWNER' || user?.role === 'CLIENT_GUEST';
 
   const { data: playbook, isLoading } = useQuery({
     queryKey: ['playbook', 'client-playbook'],

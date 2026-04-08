@@ -36,7 +36,7 @@ export function useSocket(projectId?: string) {
 
   const on = useCallback((event: string, handler: (...args: any[]) => void) => {
     socketRef.current?.on(event, handler);
-    return () => { socketRef.current?.off(event, handler); };
+    return () => socketRef.current?.off(event, handler);
   }, []);
 
   const emit = useCallback((event: string, data?: any) => {

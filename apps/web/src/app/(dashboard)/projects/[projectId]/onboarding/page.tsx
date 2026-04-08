@@ -139,8 +139,7 @@ export default function OnboardingPage({ params }: { params: { projectId: string
       const newForm = await onboardingApi.createForm(projectId, { projectId, title: template.title, mode: 'PH_FILLED' });
       const fields = template.fields || [];
       const promises = fields.map((field: any) => 
-        onboardingApi.addField(projectId, {
-          formId: newForm.id,
+        onboardingApi.addField(projectId, newForm.id, {
           label: field.label, fieldType: field.fieldType, placeholder: field.placeholder,
           options: field.options, helpText: field.helpText, isRequired: field.isRequired
         })

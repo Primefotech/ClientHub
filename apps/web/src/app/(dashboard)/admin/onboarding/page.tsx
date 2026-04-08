@@ -13,18 +13,18 @@ function FieldBuilder({ formId, fields = [] }: { formId: string, fields: Onboard
   const qc = useQueryClient();
   const [showBuilder, setShowBuilder] = useState(false);
   const [newField, setNewField] = useState<Partial<OnboardingField>>({
-    label: '', fieldType: 'TEXT', isRequired: false, placeholder: '', helpText: '', options: [],
+    label: '', fieldType: 'TEXT', isRequired: false, placeholder: '', helpText: '', options: '',
   });
 
   const addFieldMutation = useMutation({
     mutationFn: (data: any) => globalOnboardingApi.addField(formId, {
       ...data,
-      options: typeof data.options === 'string' ? data.options.split(',').map((s: string) => s.trim()).filter(Boolean) : data.options,
+      options: data.options ? (data.options as string).split(',').map(s => s.trim()) : undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['global-onboarding-forms'] });
       setShowBuilder(false);
-      setNewField({ label: '', fieldType: 'TEXT', isRequired: false, placeholder: '', helpText: '', options: [] });
+      setNewField({ label: '', fieldType: 'TEXT', isRequired: false, placeholder: '', helpText: '', options: '' });
     },
   });
 
