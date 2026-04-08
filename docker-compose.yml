@@ -37,6 +37,10 @@ services:
     ports:
       - '9000:9000'
       - '9001:9001'
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.brandbook-storage.rule=Host(`${STORAGE_DOMAIN:-storage.example.com}`)"
+      - "traefik.http.services.brandbook-storage.loadbalancer.server.port=9000"
     volumes:
       - minio_data:/data
     restart: always
@@ -77,6 +81,10 @@ services:
         condition: service_started
     ports:
       - '3001:3001'
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.brandbook-api.rule=Host(`${API_DOMAIN:-api.example.com}`)"
+      - "traefik.http.services.brandbook-api.loadbalancer.server.port=3001"
     restart: always
 
   web:
@@ -91,6 +99,10 @@ services:
       - api
     ports:
       - '3000:3000'
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.brandbook-web.rule=Host(`${WEB_DOMAIN:-example.com}`)"
+      - "traefik.http.services.brandbook-web.loadbalancer.server.port=3000"
     restart: always
 
 volumes:
