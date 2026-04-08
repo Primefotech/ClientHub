@@ -73,7 +73,7 @@ services:
       TZ: Asia/Kolkata
       DATABASE_URL: postgresql://${DB_USER:-brandbook}:${DB_PASSWORD:-brandbook_secret}@postgres:5432/${DB_NAME:-brandbook_client_os}?schema=public
       JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
-      FRONTEND_URL: https://${COMPOSE_PROJECT_NAME}.${TRAEFIK_HOST}
+      FRONTEND_URL: https://${COMPOSE_PROJECT_NAME:-clienthub}.${TRAEFIK_HOST}
       REDIS_URL: redis://redis:6379
       STORAGE_ENDPOINT: http://minio:9000
       STORAGE_ACCESS_KEY: ${STORAGE_USER:-brandbook}
