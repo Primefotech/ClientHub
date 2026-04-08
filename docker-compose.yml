@@ -42,6 +42,19 @@ services:
       - minio_data:/data
     restart: always
 
+  init-minio:
+    image: minio/mc:latest
+    container_name: brandbook_init_minio
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 ${STORAGE_USER:-brandbook} ${STORAGE_PASSWORD:-brandbook_secret};
+      /usr/bin/mc mb myminio/${STORAGE_BUCKET:-brandbook-files} --ignore-existing;
+      /usr/bin/mc anonymous set public myminio/${STORAGE_BUCKET:-brandbook-files};
+      exit 0;
+      "
+
   api:
     build:
       context: .
@@ -52,14 +65,16 @@ services:
       JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       REDIS_URL: redis://redis:6379
-      STORAGE_ENDPOINT: minio
+      STORAGE_ENDPOINT: http://minio:9000
       STORAGE_ACCESS_KEY: ${STORAGE_USER:-brandbook}
       STORAGE_SECRET_KEY: ${STORAGE_PASSWORD:-brandbook_secret}
-      STORAGE_BUCKET: ${STORAGE_BUCKET:-brandbook-assets}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-brandbook-files}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_started
+      minio:
         condition: service_started
     ports:
       - '3001:3001'
@@ -71,8 +86,8 @@ services:
       dockerfile: apps/web/Dockerfile
     container_name: brandbook_web
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001/api/v1}
-      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-http://localhost:3001}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:3001/api/v1}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-http://api:3001}
     depends_on:
       - api
     ports:
