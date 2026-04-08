@@ -1,0 +1,8 @@
+
+> @brandbook/api@1.0.0 dev
+> nest start --watch
+
+[2J[3J[H[[90m5:03:23 PM[0m] Starting compilation in watch mode...
+
+[[90m5:04:19 PM[0m] Found 0 errors. Watching for file changes.
+
