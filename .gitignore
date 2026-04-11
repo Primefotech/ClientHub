@@ -25,9 +25,7 @@ yarn-error.log*
 .npm
 .pnpm-debug.log*
 
-# Prisma
-/apps/api/prisma/migrations/
-!/apps/api/prisma/migrations/migration_lock.toml
+# Prisma — migrations must be committed so Docker can run prisma migrate deploy
 
 # IDE / Editor files
 .vscode/
