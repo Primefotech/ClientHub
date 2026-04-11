@@ -4,12 +4,14 @@ import { AppModule } from './app.module';
 import * as express from 'express';
 import { Express } from 'express';
 
+import { ExpressAdapter } from '@nestjs/platform-express';
+
 let cachedServer: Express;
 
 async function bootstrap(): Promise<Express> {
   if (!cachedServer) {
     const expressApp = express();
-    const app = await NestFactory.create(AppModule, new (require('@nestjs/platform-express').ExpressAdapter)(expressApp));
+    const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp));
     
     app.setGlobalPrefix('api/v1');
     

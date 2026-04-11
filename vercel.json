@@ -6,6 +6,11 @@
       "destination": "/api/index.ts"
     }
   ],
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "apps/api/prisma/schema.prisma"
+    }
+  },
   "redirects": [
     {
       "source": "/",
