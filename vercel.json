@@ -1,31 +1,16 @@
 {
   "version": 2,
-  "name": "brandbook-client-os",
-  "builds": [
+  "rewrites": [
     {
-      "src": "apps/web/package.json",
-      "use": "@vercel/next"
-    },
-    {
-      "src": "apps/api/src/serverless.ts",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["apps/api/prisma/schema.prisma"]
-      }
+      "source": "/api/v1/:match*",
+      "destination": "/api/index.ts"
     }
   ],
-  "routes": [
+  "redirects": [
     {
-      "src": "/api/v1/(.*)",
-      "dest": "apps/api/src/serverless.ts"
-    },
-    {
-      "src": "/_next/(.*)",
-      "dest": "apps/web/_next/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "apps/web/$1"
+      "source": "/",
+      "destination": "/login",
+      "permanent": false
     }
   ]
 }
