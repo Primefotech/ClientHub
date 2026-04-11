@@ -21,8 +21,10 @@ const nextConfig = {
 
   // Tell Next.js to trace files from the monorepo root so it includes
   // the correct node_modules in the standalone output.
+  // In Docker: __dirname = /app/apps/web, so ../../ = /app (monorepo root).
+  // Locally: resolves to the repo root. Both are correct.
   experimental: {
-    outputFileTracingRoot: path.resolve(__dirname, '../../'),
+    outputFileTracingRoot: path.resolve(__dirname, '../..'),
   },
 
   images: {
