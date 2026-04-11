@@ -1,3 +1,3 @@
-import { handler } from '../apps/api/src/serverless';
+import { handler } from '../api_backend/src/serverless';
 
 export default handler;

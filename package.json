@@ -3,18 +3,19 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "api_backend"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
-    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:api": "npm run dev --workspace=api_backend",
     "dev:web": "npm run dev --workspace=apps/web",
-    "build": "npm run db:generate && npm run build --workspace=apps/api && npm run build --workspace=apps/web",
+    "build": "npm run db:generate && npm run build --workspace=api_backend && npm run build --workspace=apps/web",
     "postinstall": "npm run db:generate",
-    "db:generate": "npm run db:generate --workspace=apps/api",
-    "db:migrate": "npm run db:migrate --workspace=apps/api",
-    "db:seed": "npm run db:seed --workspace=apps/api",
-    "db:studio": "npm run db:studio --workspace=apps/api"
+    "db:generate": "npm run db:generate --workspace=api_backend",
+    "db:migrate": "npm run db:migrate --workspace=api_backend",
+    "db:seed": "npm run db:seed --workspace=api_backend",
+    "db:studio": "npm run db:studio --workspace=api_backend"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

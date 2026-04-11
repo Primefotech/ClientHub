@@ -24,7 +24,7 @@
   ],
   "functions": {
     "api/index.ts": {
-      "includeFiles": "apps/api/prisma/schema.prisma"
+      "includeFiles": "api_backend/prisma/schema.prisma"
     }
   },
   "redirects": [
