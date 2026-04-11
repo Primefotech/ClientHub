@@ -1,0 +1,39 @@
+# Ignore Node.js / Build files
+node_modules
+.next
+dist
+build
+out
+
+# Ignore source code from being treated as Serverless Functions
+# Vercel scans the repo for .ts/.js files. We want to force it to use root /api folder.
+apps/api/src
+apps/api/test
+apps/web/src
+
+# Ignore infrastructure files
+docker-compose.yml
+Dockerfile
+nginx
+.github
+.agents
+.roo
+.windsurf
+.trae
+.continue
+.pi
+.openhands
+.pochi
+.junie
+.mux
+.kiro
+.factory
+.crush
+.codebuddy
+.commandcode
+.qoder
+.neovate
+.zencoder
+.kode
+.mcpjam
+.qwen

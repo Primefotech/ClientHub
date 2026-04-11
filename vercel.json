@@ -2,8 +2,24 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/api/v1/:match*",
+      "source": "/api/v1/:path*",
       "destination": "/api/index.ts"
+    },
+    {
+      "source": "/_next/:path*",
+      "destination": "/apps/web/_next/:path*"
+    },
+    {
+      "source": "/static/:path*",
+      "destination": "/apps/web/static/:path*"
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": "/apps/web/public/favicon.ico"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/apps/web/$1"
     }
   ],
   "functions": {
