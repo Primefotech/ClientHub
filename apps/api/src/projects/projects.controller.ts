@@ -17,7 +17,7 @@ export class ProjectsController {
   @Get()
   findAll(
     @CurrentUser() user: any,
-    @Query() query: { tenantId?: string; search?: string },
+    @Query() query: { tenantId?: string; search?: string; includeArchived?: string | boolean },
   ) {
     return this.projectsService.findAll(user.id, user.role, query);
   }
@@ -48,5 +48,17 @@ export class ProjectsController {
   @Roles(Role.SUPER_ADMIN)
   delete(@Param('id') id: string) {
     return this.projectsService.delete(id);
+  }
+
+  @Patch(':id/archive')
+  @Roles(Role.SUPER_ADMIN)
+  archive(@Param('id') id: string) {
+    return this.projectsService.archive(id);
+  }
+
+  @Patch(':id/restore')
+  @Roles(Role.SUPER_ADMIN)
+  restore(@Param('id') id: string) {
+    return this.projectsService.restore(id);
   }
 }

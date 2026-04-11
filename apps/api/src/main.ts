@@ -13,11 +13,31 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   // CORS
+  // In production with Nginx same-domain routing, CORS headers are rarely
+  // triggered (browser sees same origin). This config handles direct API
+  // access, dev environments, and multi-domain setups.
+  //
+  // FRONTEND_URL supports comma-separated list:
+  //   FRONTEND_URL=https://yourdomain.com,https://www.yourdomain.com
+  const rawOrigins = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const allowedOrigins = rawOrigins.split(',').map((o) => o.trim()).filter(Boolean);
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (incomingOrigin, callback) => {
+      // Allow server-to-server requests (no Origin header) — internal Docker calls
+      if (!incomingOrigin) return callback(null, true);
+      // Allow wildcard (set FRONTEND_URL=* to open all origins, dev only)
+      if (allowedOrigins.includes('*')) return callback(null, true);
+      // Allow if origin matches any configured value
+      if (allowedOrigins.includes(incomingOrigin)) return callback(null, true);
+      // Reject unknown origins
+      Logger.warn(`CORS blocked request from: ${incomingOrigin}`);
+      return callback(new Error(`CORS policy: origin ${incomingOrigin} is not allowed`), false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['X-Total-Count'],
   });
 
   // Global validation pipe

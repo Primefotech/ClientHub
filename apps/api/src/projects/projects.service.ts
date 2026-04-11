@@ -9,14 +9,31 @@ export interface CreateProjectDto {
   color?: string;
   icon?: string;
   settings?: Record<string, any>;
+  brandAssetsUrl?: string;
+  isHandoverComplete?: boolean;
+  projectManagerId?: string;
+  milestones?: any;
+  serviceId?: string;
+  figmaLink?: string;
+  stagingLink?: string;
+  proposalUrl?: string;
+  hasSLA?: boolean;
+  slaType?: string;
+  slaDocumentUrl?: string;
+  supportSystemActive?: boolean;
+  maxRevisions?: number;
+  handoverCredentials?: string;
+  trainingScheduledAt?: Date;
+  handoverDocuments?: string[];
+  handoverLinks?: string[];
 }
 
 @Injectable()
 export class ProjectsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(userId: string, userRole: Role, query: { tenantId?: string; search?: string }) {
-    const { tenantId, search } = query;
+  async findAll(userId: string, userRole: Role, query: { tenantId?: string; search?: string; includeArchived?: string | boolean }) {
+    const { tenantId, search, includeArchived } = query;
     const where: any = {};
 
     if (tenantId) where.tenantId = tenantId;
@@ -27,6 +44,13 @@ export class ProjectsService {
       where.projectUsers = { some: { userId } };
     }
 
+    // Default to only showing non-archived projects
+    if (includeArchived === 'true' || includeArchived === true) {
+      // Show everything
+    } else {
+      where.isArchived = false;
+    }
+
     return this.prisma.project.findMany({
       where,
       include: {
@@ -34,6 +58,7 @@ export class ProjectsService {
         projectUsers: {
           include: { user: { select: { id: true, name: true, email: true, avatar: true, role: true } } },
         },
+        service: true,
         _count: {
           select: { creatives: true, crmLeads: true, calendarEvents: true },
         },
@@ -50,8 +75,15 @@ export class ProjectsService {
         projectUsers: {
           include: { user: { select: { id: true, name: true, email: true, avatar: true, role: true } } },
         },
+        projectManager: {
+          select: { id: true, name: true, email: true, avatar: true, role: true },
+        },
         approvalRules: true,
         ruleConfigs: true,
+        service: true,
+        meetingRequests: { take: 5, orderBy: { createdAt: 'desc' } },
+        supportTickets: { where: { status: 'OPEN' } },
+        revisionRequests: { take: 5, orderBy: { createdAt: 'desc' } },
         _count: {
           select: {
             creatives: true, crmLeads: true, calendarEvents: true,
@@ -73,7 +105,17 @@ export class ProjectsService {
 
   async create(dto: CreateProjectDto) {
     return this.prisma.project.create({
-      data: dto,
+      data: {
+        ...dto,
+        milestones: dto.milestones || [
+          { id: '1', label: 'Proposal Sent', status: 'completed' },
+          { id: '2', label: 'Payment Received', status: 'pending' },
+          { id: '3', label: 'Project Kickoff', status: 'pending' },
+          { id: '4', label: 'Design & Development', status: 'pending' },
+          { id: '5', label: 'Review & Feedback', status: 'pending' },
+          { id: '6', label: 'Project Delivery', status: 'pending' },
+        ],
+      },
       include: { tenant: { select: { id: true, name: true } } },
     });
   }
@@ -97,6 +139,9 @@ export class ProjectsService {
       upcomingEvents,
       adStats,
       recentActivity,
+      project,
+      openTickets,
+      pendingMeetings,
     ] = await Promise.all([
       this.prisma.approvalRequest.count({
         where: { creative: { projectId: id }, status: 'PENDING_APPROVAL' },
@@ -116,6 +161,12 @@ export class ProjectsService {
         include: { user: { select: { id: true, name: true, avatar: true } } },
         orderBy: { createdAt: 'desc' },
       }),
+      this.prisma.project.findUnique({
+        where: { id },
+        select: { revisionCount: true, milestones: true, isHandoverComplete: true },
+      }),
+      this.prisma.supportTicket.count({ where: { projectId: id, status: 'OPEN' } }),
+      this.prisma.meetingRequest.count({ where: { projectId: id, status: 'PENDING' } }),
     ]);
 
     return {
@@ -128,6 +179,9 @@ export class ProjectsService {
       totalConversions: adStats._sum.conversions || 0,
       totalRevenue: adStats._sum.revenue || 0,
       recentActivity,
+      revisions: project?.revisionCount ?? 0,
+      openTickets,
+      pendingMeetings,
     };
   }
 
@@ -136,5 +190,19 @@ export class ProjectsService {
       where: { projectId_userId: { projectId, userId } },
     });
     return pu?.role ?? null;
+  }
+
+  async archive(id: string) {
+    return this.prisma.project.update({
+      where: { id },
+      data: { isArchived: true, archivedAt: new Date() },
+    });
+  }
+
+  async restore(id: string) {
+    return this.prisma.project.update({
+      where: { id },
+      data: { isArchived: false, archivedAt: null },
+    });
   }
 }

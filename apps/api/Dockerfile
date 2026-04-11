@@ -1,46 +1,46 @@
-# Base stage for dependencies and building
+# ─── Stage 1: Builder ───────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
-
 WORKDIR /app
 
-# Copy root lock files and package.json
-COPY package*.json ./
-COPY apps/api/package*.json ./apps/api/
+# Copy workspace manifests first (cache layer)
+COPY package.json ./
+COPY apps/api/package.json ./apps/api/
 
-# Install dependencies (using workspaces to handle monorepo structure)
-RUN npm install
+# Install all deps (npm workspaces hoists to root node_modules)
+RUN npm install --workspace=apps/api
 
-# Copy source code
-COPY apps/api ./apps/api
-COPY tsconfig.json ./
+# Copy full API source
+COPY apps/api/ ./apps/api/
 
 # Generate Prisma client
-WORKDIR /app/apps/api
-RUN npx prisma generate
+RUN cd apps/api && npx prisma generate
 
-# Build the app
-RUN npm run build
+# Build NestJS TypeScript → dist/
+RUN cd apps/api && npm run build
 
-# Production stage
-FROM node:20-alpine
-
+# ─── Stage 2: Production ────────────────────────────────────────────────────
+FROM node:20-alpine AS production
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-COPY apps/api/package*.json ./apps/api/
+ENV NODE_ENV=production
 
-# Install only production dependencies
-RUN npm install --omit=dev
+# Copy manifests
+COPY package.json ./
+COPY apps/api/package.json ./apps/api/
 
-# Copy built assets and prisma from builder
+# Copy Prisma schema so postinstall can generate client
+COPY apps/api/prisma ./apps/api/prisma
+
+# Install production deps only (postinstall auto-runs `prisma generate`)
+RUN npm install --workspace=apps/api --omit=dev
+
+# Copy compiled output
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
-# Expose API port
+# Copy entrypoint script
+COPY apps/api/docker-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 EXPOSE 3001
 
-WORKDIR /app/apps/api
-CMD ["npm", "run", "start"]
+ENTRYPOINT ["/entrypoint.sh"]

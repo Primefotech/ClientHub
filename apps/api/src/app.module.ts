@@ -21,6 +21,8 @@ import { UpsellModule } from './upsell/upsell.module';
 import { ActivityLogsModule } from './activity-logs/activity-logs.module';
 import { SettingsModule } from './settings/settings.module';
 import { PlaybooksModule } from './playbooks/playbooks.module';
+import { ServicesModule } from './services/services.module';
+import { ProjectExtensionsModule } from './project-extensions/project-extensions.module';
 import { EventsGateway } from './gateways/events.gateway';
 
 @Module({
@@ -47,6 +49,8 @@ import { EventsGateway } from './gateways/events.gateway';
     ActivityLogsModule,
     SettingsModule,
     PlaybooksModule,
+    ServicesModule,
+    ProjectExtensionsModule,
   ],
   providers: [EventsGateway],
 })

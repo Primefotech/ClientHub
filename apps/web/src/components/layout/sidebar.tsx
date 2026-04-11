@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils';
 import { ROLE_LABELS, canAccessModule } from '@/lib/auth';
 import {
   LayoutDashboard, Users, Building2, FolderKanban, Image, CheckSquare,
-  Users2, MessageSquare, BarChart3, ClipboardList, Calendar, Bell,
-  Settings, TrendingUp, Shield, Zap, BookOpen, ChevronDown, LogOut, Tags
+  Users2, MessageSquare, BarChart3, ClipboardList, Calendar,
+  Settings, TrendingUp, Briefcase, Zap, BookOpen, ChevronDown, LogOut, Sparkles, Monitor, Archive
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -23,7 +23,8 @@ interface NavItem {
 interface SidebarProps {
   user: User;
   projectId?: string;
-  projects?: Array<{ id: string; name: string; color?: string; icon?: string }>;
+  projects?: Array<{ id: string; name: string; color?: string; icon?: string; service?: { hasWebDev?: boolean } }>;
+  activeProject?: any;
   onLogout: () => void;
 }
 
@@ -31,34 +32,42 @@ const getAdminNav = (): NavItem[] => [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
   { label: 'Tenants', href: '/admin/tenants', icon: <Building2 className="w-4 h-4" />, module: 'admin' },
   { label: 'Users', href: '/admin/users', icon: <Users className="w-4 h-4" />, module: 'admin' },
+  { label: 'Services', href: '/admin/services', icon: <Briefcase className="w-4 h-4" />, module: 'admin' },
   { label: 'Content Types', href: '/admin/content-types', icon: <FolderKanban className="w-4 h-4" />, module: 'content-types' },
   { label: 'Onboarding', href: '/admin/onboarding', icon: <ClipboardList className="w-4 h-4" />, module: 'admin' },
   { label: 'Upsells', href: '/admin/upsell', icon: <TrendingUp className="w-4 h-4" />, module: 'admin' },
   { label: 'Reports', href: '/admin/reports', icon: <BarChart3 className="w-4 h-4" />, module: 'admin' },
+  { label: 'Archive', href: '/admin/archive', icon: <Archive className="w-4 h-4" />, module: 'admin' },
   { label: 'Playbook', href: '/admin/playbook', icon: <BookOpen className="w-4 h-4" />, module: 'admin' },
   { label: 'Settings', href: '/admin/settings', icon: <Settings className="w-4 h-4" />, module: 'admin' },
 ];
 
-const getProjectNav = (projectId: string): NavItem[] => [
+const getProjectNav = (projectId: string, hasWebDev?: boolean): NavItem[] => [
   { label: 'Dashboard', href: `/projects/${projectId}`, icon: <LayoutDashboard className="w-4 h-4" /> },
-  { label: 'Creatives', href: `/projects/${projectId}/creatives`, icon: <Image className="w-4 h-4" />, module: 'creatives' },
+  // Show Web Design & Dev OR Creatives based on service type
+  ...(hasWebDev
+    ? [{ label: 'Web Design & Dev', href: `/projects/${projectId}/webdev`, icon: <Monitor className="w-4 h-4" />, module: 'creatives' }]
+    : [{ label: 'Creatives', href: `/projects/${projectId}/creatives`, icon: <Image className="w-4 h-4" />, module: 'creatives' }]
+  ),
   { label: 'Approvals', href: `/projects/${projectId}/approvals`, icon: <CheckSquare className="w-4 h-4" />, module: 'approvals' },
   { label: 'Calendar', href: `/projects/${projectId}/calendar`, icon: <Calendar className="w-4 h-4" />, module: 'calendar' },
   { label: 'CRM', href: `/projects/${projectId}/crm`, icon: <Users2 className="w-4 h-4" />, module: 'crm' },
   { label: 'Communications', href: `/projects/${projectId}/communications`, icon: <MessageSquare className="w-4 h-4" />, module: 'communications' },
   { label: 'Reports', href: `/projects/${projectId}/reports`, icon: <BarChart3 className="w-4 h-4" />, module: 'reports' },
   { label: 'Onboarding', href: `/projects/${projectId}/onboarding`, icon: <ClipboardList className="w-4 h-4" />, module: 'onboarding' },
-  { label: 'Upsell', href: `/projects/${projectId}/upsell`, icon: <TrendingUp className="w-4 h-4" />, module: 'upsell' },
+  { label: 'Recommended Services', href: `/projects/${projectId}/upsell`, icon: <Sparkles className="w-4 h-4" />, module: 'upsell' },
   { label: 'Playbook', href: `/projects/${projectId}/playbook`, icon: <BookOpen className="w-4 h-4" /> },
   { label: 'Settings', href: `/projects/${projectId}/settings`, icon: <Settings className="w-4 h-4" />, module: 'settings' },
 ];
 
-export function Sidebar({ user, projectId, projects = [], onLogout }: SidebarProps) {
+export function Sidebar({ user, projectId, projects = [], activeProject, onLogout }: SidebarProps) {
   const pathname = usePathname();
   const [projectsExpanded, setProjectsExpanded] = useState(true);
 
   const adminNav = getAdminNav();
-  const projectNav = projectId ? getProjectNav(projectId) : [];
+  const resolvedActiveProject = activeProject || (projectId ? projects.find(p => p.id === projectId) : null);
+  const hasWebDev = resolvedActiveProject?.service?.hasWebDev === true;
+  const projectNav = projectId ? getProjectNav(projectId, hasWebDev) : [];
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
@@ -66,7 +75,7 @@ export function Sidebar({ user, projectId, projects = [], onLogout }: SidebarPro
   };
 
   const navItem = ({ label, href, icon, module: mod }: NavItem) => {
-    if (mod && !canAccessModule(user, mod, projectId)) return null;
+    if (mod && !canAccessModule(user, mod, projectId, resolvedActiveProject)) return null;
     return (
       <Link
         key={href}

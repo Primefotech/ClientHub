@@ -1,0 +1,49 @@
+# Root-level ignores (applied when build context is the monorepo root)
+
+# Version control
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Env files (secrets must never go into image layers)
+.env
+.env.*
+!.env.example
+
+# Node modules (reinstalled inside Docker)
+node_modules/
+apps/*/node_modules/
+
+# Build outputs (rebuilt inside Docker)
+apps/api/dist/
+apps/web/.next/
+apps/web/out/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Test files
+**/*.test.ts
+**/*.spec.ts
+**/test/
+**/tests/
+**/__tests__/
+
+# Scratch files
+apps/api/scratch/
+
+# CI / deployment scripts (not needed inside container)
+.github/

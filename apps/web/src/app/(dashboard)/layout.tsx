@@ -62,7 +62,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar
         user={user}
         projectId={projectId}
-        projects={projects.map((p) => ({ id: p.id, name: p.name, color: p.color, icon: p.icon }))}
+        projects={projects}
         onLogout={logout}
       />
       <main className="flex-1 flex flex-col overflow-hidden">

@@ -33,6 +33,8 @@ model User {
   createdThreads    Thread[]
   createdUpsells    UpsellRecommendation[]
   webhookConfigs    WebhookConfig[]
+  managedProjects   Project[]              @relation("ProjectManager")
+  meetingRequests   MeetingRequest[]
 
   @@map("users")
 }
@@ -92,8 +94,107 @@ model Project {
   ruleConfigs     RuleEngineConfig[]
   threads         Thread[]
   upsells         UpsellRecommendation[]
+  
+  // Tracking & Handover
+  brandAssetsUrl     String?
+  isHandoverComplete Boolean                @default(false)
+  projectManagerId   String?
+  projectManager     User?                  @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  milestones         Json                   @default("[]")
+
+  // Service & Features
+  serviceId          String?
+  service            Service?               @relation(fields: [serviceId], references: [id])
+  
+  // Web Dev Specifics
+  figmaLink          String?
+  stagingLink        String?
+  uiUxApprovedAt     DateTime?
+  contentApprovedAt  DateTime?
+  
+  // Handover Extended
+  handoverCredentials String?
+  trainingScheduledAt DateTime?
+  handoverDocuments   String[]
+  handoverLinks       String[]
+  
+  // SLA & Support
+  hasSLA             Boolean                @default(false)
+  slaType            String?                // YEARLY, MONTHLY
+  slaDocumentUrl     String?
+  supportSystemActive Boolean               @default(false)
+  
+  // Proposal & Scope
+  proposalUrl        String?
+  
+  // Revisions
+  revisionCount      Int                    @default(0)
+  maxRevisions       Int                    @default(3)
+  
+  // Archival
+  isArchived         Boolean                @default(false)
+  archivedAt         DateTime?
+  
+  meetingRequests    MeetingRequest[]
+  supportTickets     SupportTicket[]
+  revisionRequests   RevisionRequest[]
 
   @@map("projects")
+}
+
+model Service {
+  id              String    @id @default(cuid())
+  name            String
+  description     String?
+  hasCRM          Boolean   @default(false)
+  hasCalendar     Boolean   @default(false)
+  hasWebDev       Boolean   @default(false)
+  hasAdReporting  Boolean   @default(false)
+  projects        Project[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("services")
+}
+
+model MeetingRequest {
+  id          String    @id @default(cuid())
+  projectId   String
+  requesterId String
+  agenda      String
+  status      String    @default("PENDING") // PENDING, APPROVED, REJECTED, COMPLETED
+  scheduledAt DateTime?
+  createdAt   DateTime  @default(now())
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requester   User      @relation(fields: [requesterId], references: [id])
+
+  @@map("meeting_requests")
+}
+
+model SupportTicket {
+  id          String   @id @default(cuid())
+  projectId   String
+  subject     String
+  description String
+  status      String   @default("OPEN")
+  priority    String   @default("MEDIUM")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("support_tickets")
+}
+
+model RevisionRequest {
+  id          String   @id @default(cuid())
+  projectId   String
+  description String
+  documents   String[] // Array of URLs
+  requestedBy String   // Name or ID of PH or Admin
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("revision_requests")
 }
 
 model ProjectUser {

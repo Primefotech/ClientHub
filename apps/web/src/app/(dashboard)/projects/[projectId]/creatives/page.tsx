@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/layout/header';
-import { creativesApi, contentTypesApi, commsApi } from '@/lib/api';
+import { creativesApi, contentTypesApi, commsApi, projectsApi } from '@/lib/api';
+import { canAccessModule } from '@/lib/auth';
 import { Creative, ContentType } from '@/types';
 import { hasPermission } from '@/lib/auth';
 import { STATUS_COLORS, formatRelativeTime, cn } from '@/lib/utils';
-import { Plus, Upload, Image, Video, FileText, Filter, Grid, List, Eye, Trash2, Edit, MessageSquare, Send, ArrowLeft } from 'lucide-react';
+import { Plus, Upload, Image, Video, FileText, Filter, Grid, List, Eye, Trash2, Edit, MessageSquare, Send, ArrowLeft, Monitor, ExternalLink } from 'lucide-react';
 
 const FILE_TYPE_ICONS: Record<string, string> = {
   image: '🖼️', video: '🎬', carousel: '🎠', ad_copy: '✍️', text: '📝', document: '📄',
@@ -90,6 +91,11 @@ export default function CreativesPage({ params }: { params: { projectId: string 
   const canDelete = hasPermission(user, projectId, 'creatives', 'delete');
   const canUpdate = hasPermission(user, projectId, 'creatives', 'update');
 
+  const { data: project } = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: () => projectsApi.get(projectId),
+  });
+
   const { data, isLoading } = useQuery({
     queryKey: ['creatives', projectId, statusFilter],
     queryFn: () => creativesApi.list(projectId, { status: statusFilter || undefined }),
@@ -151,6 +157,27 @@ export default function CreativesPage({ params }: { params: { projectId: string 
           </div>
         }
       />
+
+      {/* Web Dev Redirect Banner */}
+      {project?.service?.hasWebDev && (
+        <div className="mx-6 mt-4 bg-gradient-to-r from-purple-600 to-brandbook-700 rounded-2xl p-5 text-white flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <Monitor className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-white">This project uses the Web Design &amp; Dev workspace</h3>
+              <p className="text-sm text-white/70 mt-0.5">Upload and review deliverables — designs, content, sitemaps, and more — in the dedicated workspace.</p>
+            </div>
+          </div>
+          <a
+            href={`/projects/${projectId}/webdev`}
+            className="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 bg-white text-purple-700 font-bold text-sm rounded-xl hover:bg-purple-50 transition-colors"
+          >
+            Go to Workspace <ExternalLink className="w-4 h-4" />
+          </a>
+        </div>
+      )}
 
       <div className="flex-1 p-6 space-y-4">
         {/* Filters */}

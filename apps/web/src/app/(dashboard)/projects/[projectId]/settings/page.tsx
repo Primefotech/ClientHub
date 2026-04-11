@@ -1,16 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/layout/header';
-import { projectsApi, approvalsApi, ruleEngineApi, usersApi } from '@/lib/api';
+import { Settings, Zap, Users, Lock, Unlock, Shield, Plus, Trash2, ExternalLink, Download, CheckCircle2, Clock, Briefcase, Globe, Cpu, FileText, Key, GraduationCap, Link2, LifeBuoy } from 'lucide-react';
+import { servicesApi, projectsApi, approvalsApi, ruleEngineApi, usersApi, projectExtensionsApi } from '@/lib/api';
 import { ApprovalRule } from '@/types';
 import { cn } from '@/lib/utils';
-import { Settings, Zap, Users, Lock, Unlock, Shield, Plus, Trash2 } from 'lucide-react';
 
 const TABS = [
   { id: 'general', label: 'General', icon: Settings },
+  { id: 'webdev', label: 'Web Dev', icon: Cpu },
+  { id: 'handover', label: 'Handover & SLA', icon: ExternalLink },
   { id: 'team', label: 'Team', icon: Users },
   { id: 'approvals', label: 'Approval Rules', icon: Shield },
   { id: 'rules', label: 'Rule Engine', icon: Zap },
@@ -20,10 +22,27 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
   const { user } = useAuth();
   const { projectId } = params;
   const qc = useQueryClient();
+  const canManage = ['SUPER_ADMIN', 'PROJECT_HEAD'].includes(user?.role || '');
+
   const [activeTab, setActiveTab] = useState('general');
   const [editingUser, setEditingUser] = useState<any>(null);
 
-  const canManage = ['SUPER_ADMIN', 'PROJECT_HEAD'].includes(user?.role || '');
+  // ── Per-tab local form state (initialized from project once loaded)
+  const [generalForm, setGeneralForm] = useState<any>(null);
+  const [webdevForm, setWebdevForm] = useState<any>(null);
+  const [handoverForm, setHandoverForm] = useState<any>(null);
+
+  const { data: staff } = useQuery({
+    queryKey: ['staff'],
+    queryFn: () => usersApi.list({ roles: ['SUPER_ADMIN', 'PROJECT_HEAD', 'BRANDBOOK_STAFF'] }),
+    enabled: activeTab === 'general' || activeTab === 'team',
+  });
+
+  const { data: services } = useQuery({
+    queryKey: ['services'],
+    queryFn: () => servicesApi.list(),
+    enabled: activeTab === 'general',
+  });
 
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
@@ -42,19 +61,88 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
     enabled: activeTab === 'rules',
   });
 
+  // ── Initialize form state when project loads
+  useEffect(() => {
+    if (project && !generalForm) {
+      setGeneralForm({
+        name: project.name || '',
+        description: project.description || '',
+        status: project.status || 'ACTIVE',
+        color: project.color || '#6366f1',
+        projectManagerId: project.projectManagerId || '',
+        brandAssetsUrl: project.brandAssetsUrl || '',
+        isHandoverComplete: project.isHandoverComplete || false,
+        serviceId: project.serviceId || '',
+        proposalUrl: project.proposalUrl || '',
+        maxRevisions: project.maxRevisions || 3,
+      });
+    }
+    if (project && !webdevForm) {
+      setWebdevForm({
+        figmaLink: project.figmaLink || '',
+        stagingLink: project.stagingLink || '',
+        maxRevisions: project.maxRevisions || 3,
+      });
+    }
+    if (project && !handoverForm) {
+      setHandoverForm({
+        handoverCredentials: project.handoverCredentials || '',
+        trainingScheduledAt: project.trainingScheduledAt
+          ? new Date(project.trainingScheduledAt).toISOString().slice(0, 16)
+          : '',
+        hasSLA: project.hasSLA || false,
+        slaType: project.slaType || '',
+        slaDocumentUrl: project.slaDocumentUrl || '',
+        supportSystemActive: project.supportSystemActive || false,
+      });
+    }
+  }, [project]);
+
+  // ── Mutations
   const lockRuleMutation = useMutation({
     mutationFn: (ruleId: string) => approvalsApi.lockRule(projectId, ruleId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['approval-rules', projectId] }),
   });
 
   const updatePermissionsMutation = useMutation({
-    mutationFn: (data: { userId: string, role: string, permissions: any }) => 
+    mutationFn: (data: { userId: string, role: string, permissions: any }) =>
       usersApi.assignProject(data.userId, { projectId, role: data.role, permissions: data.permissions }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['project', projectId] });
       setEditingUser(null);
     }
   });
+
+  const updateProjectMutation = useMutation({
+    mutationFn: (data: any) => projectsApi.update(projectId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['project', projectId] });
+    }
+  });
+
+  const createRevisionMutation = useMutation({
+    mutationFn: (description: string) => projectExtensionsApi.createRevision(projectId, { description }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['project', projectId] });
+      setWebdevForm({ ...webdevForm, showRevForm: false, revDesc: '' });
+    }
+  });
+
+  const toggleMilestone = (milestoneId: string) => {
+    if (!project?.milestones) return;
+    const newMilestones = project.milestones.map((m: any) => {
+      if (m.id === milestoneId) {
+        return {
+          ...m,
+          status: m.status === 'completed' ? 'pending' : 'completed',
+          updatedAt: new Date().toISOString(),
+          updatedBy: user?.name
+        };
+      }
+      return m;
+    });
+    updateProjectMutation.mutate({ milestones: newMilestones });
+  };
 
   const ruleList: ApprovalRule[] = Array.isArray(rules) ? rules : [];
   const configs = Array.isArray(ruleConfigs) ? ruleConfigs : [];
@@ -88,52 +176,454 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            {activeTab === 'general' && (
+
+            {/* ───────────────── GENERAL TAB ───────────────── */}
+            {activeTab === 'general' && generalForm && project && (
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <h2 className="text-base font-semibold text-gray-900 mb-4">General Settings</h2>
-                {project && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
-                      <input defaultValue={project.name}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+                    <input
+                      value={generalForm.name}
+                      disabled={!canManage}
+                      onChange={(e) => setGeneralForm({ ...generalForm, name: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brandbook-400 disabled:bg-gray-50 disabled:text-gray-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      value={generalForm.description}
+                      disabled={!canManage}
+                      onChange={(e) => setGeneralForm({ ...generalForm, description: e.target.value })}
+                      rows={3}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm resize-none disabled:bg-gray-50"
+                    />
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      <select
+                        value={generalForm.status}
                         disabled={!canManage}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brandbook-400 disabled:bg-gray-50 disabled:text-gray-500" />
+                        onChange={(e) => setGeneralForm({ ...generalForm, status: e.target.value })}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option>ACTIVE</option>
+                        <option>PAUSED</option>
+                        <option>COMPLETED</option>
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Project Manager</label>
+                      <select
+                        value={generalForm.projectManagerId}
+                        disabled={!canManage}
+                        onChange={(e) => setGeneralForm({ ...generalForm, projectManagerId: e.target.value })}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="">Select Manager</option>
+                        {staff?.users?.map((s: any) => (
+                          <option key={s.id} value={s.id}>{s.name} ({s.role.replace('_', ' ')})</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                      <textarea defaultValue={project.description || ''}
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
+                      <input
+                        type="color"
+                        value={generalForm.color}
                         disabled={!canManage}
-                        rows={3}
-                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm resize-none disabled:bg-gray-50" />
+                        onChange={(e) => setGeneralForm({ ...generalForm, color: e.target.value })}
+                        className="w-12 h-10 border border-gray-300 rounded-lg cursor-pointer"
+                      />
                     </div>
-                    <div className="flex items-center gap-4">
+                  </div>
+
+                  {/* Handover quick fields */}
+                  <div className="pt-4 border-t border-gray-50">
+                    <h3 className="text-sm font-bold text-gray-900 mb-3 uppercase tracking-wider">Project Handover</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                        <select defaultValue={project.status}
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Brand Assets URL (Drive Link)</label>
+                        <input
+                          value={generalForm.brandAssetsUrl}
                           disabled={!canManage}
-                          className="px-3 py-2.5 border border-gray-300 rounded-lg text-sm">
-                          <option>ACTIVE</option>
-                          <option>PAUSED</option>
-                          <option>COMPLETED</option>
+                          placeholder="https://drive.google.com/..."
+                          onChange={(e) => setGeneralForm({ ...generalForm, brandAssetsUrl: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+                      <div className="flex items-end pb-1">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <div
+                            className={cn(
+                              "w-10 h-6 rounded-full p-1 transition-colors duration-200 cursor-pointer",
+                              generalForm.isHandoverComplete ? "bg-brandbook-500" : "bg-gray-200"
+                            )}
+                            onClick={() => {
+                              if (!canManage) return;
+                              const newVal = !generalForm.isHandoverComplete;
+                              setGeneralForm({ ...generalForm, isHandoverComplete: newVal });
+                            }}
+                          >
+                            <div className={cn(
+                              "w-4 h-4 bg-white rounded-full transition-transform duration-200",
+                              generalForm.isHandoverComplete ? "translate-x-4" : "translate-x-0"
+                            )} />
+                          </div>
+                          <span className="text-sm font-medium text-gray-700">Handover Complete</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Service */}
+                  <div className="pt-4 border-t border-gray-50">
+                    <h3 className="text-sm font-bold text-gray-900 mb-3 uppercase tracking-wider">Service Tier & Scope</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Service</label>
+                        <select
+                          value={generalForm.serviceId}
+                          disabled={!canManage}
+                          onChange={(e) => setGeneralForm({ ...generalForm, serviceId: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
+                        >
+                          <option value="">Select Service Package</option>
+                          {(services || []).map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
-                        <input type="color" defaultValue={project.color || '#6366f1'}
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Proposal URL</label>
+                        <input
+                          value={generalForm.proposalUrl}
                           disabled={!canManage}
-                          className="w-12 h-10 border border-gray-300 rounded-lg cursor-pointer" />
+                          placeholder="https://link-to-proposal.pdf"
+                          onChange={(e) => setGeneralForm({ ...generalForm, proposalUrl: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
+                        />
                       </div>
                     </div>
-                    {canManage && (
-                      <button className="mt-2 px-4 py-2 bg-brandbook-500 text-white text-sm font-medium rounded-lg hover:bg-brandbook-600 transition-colors">
-                        Save Changes
-                      </button>
-                    )}
                   </div>
-                )}
+
+                  {/* Milestones */}
+                  <div className="pt-4 border-t border-gray-50">
+                    <h3 className="text-sm font-bold text-gray-900 mb-3 uppercase tracking-wider">Milestone Management</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {project.milestones?.map((m: any) => (
+                        <button
+                          key={m.id}
+                          onClick={() => toggleMilestone(m.id)}
+                          className={cn(
+                            "flex items-center justify-between p-3 rounded-xl border transition-all text-left",
+                            m.status === 'completed'
+                              ? "bg-emerald-50 border-emerald-100 text-emerald-900"
+                              : "bg-gray-50 border-gray-100 text-gray-500 hover:border-gray-200"
+                          )}
+                        >
+                          <span className="text-xs font-bold">{m.label}</span>
+                          {m.status === 'completed' ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          ) : (
+                            <Clock className="w-4 h-4 text-gray-300" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {canManage && (
+                    <button
+                      onClick={() => updateProjectMutation.mutate(generalForm)}
+                      disabled={updateProjectMutation.isPending}
+                      className="mt-4 px-6 py-2.5 bg-brandbook-500 text-white text-sm font-bold rounded-xl hover:bg-brandbook-600 disabled:opacity-50 transition-all shadow-md shadow-brandbook-500/20"
+                    >
+                      {updateProjectMutation.isPending ? 'Saving…' : 'Save General Settings'}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
+            {/* ───────────────── WEB DEV TAB ───────────────── */}
+            {activeTab === 'webdev' && webdevForm && project && (
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <h2 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Cpu className="w-5 h-5 text-brandbook-500" />
+                  Web Design & Development Settings
+                </h2>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Figma Design Link</label>
+                      <input
+                        value={webdevForm.figmaLink}
+                        disabled={!canManage}
+                        placeholder="https://figma.com/file/..."
+                        onChange={(e) => setWebdevForm({ ...webdevForm, figmaLink: e.target.value })}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Staging / Preview Link</label>
+                      <input
+                        value={webdevForm.stagingLink}
+                        disabled={!canManage}
+                        placeholder="https://staging.domain.com"
+                        onChange={(e) => setWebdevForm({ ...webdevForm, stagingLink: e.target.value })}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-50">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">UI/UX Approval Status</label>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => updateProjectMutation.mutate({ uiUxApprovedAt: project.uiUxApprovedAt ? null : new Date() })}
+                          className={cn(
+                            "flex-1 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all flex items-center justify-center gap-2",
+                            project.uiUxApprovedAt ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-gray-50 border-gray-200 text-gray-500"
+                          )}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          {project.uiUxApprovedAt ? 'Approved' : 'Mark UI/UX Approved'}
+                        </button>
+                        {project.uiUxApprovedAt && (
+                          <span className="text-xs text-gray-400">On {new Date(project.uiUxApprovedAt).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Content Approval Status</label>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => updateProjectMutation.mutate({ contentApprovedAt: project.contentApprovedAt ? null : new Date() })}
+                          className={cn(
+                            "flex-1 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all flex items-center justify-center gap-2",
+                            project.contentApprovedAt ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-gray-50 border-gray-200 text-gray-500"
+                          )}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          {project.contentApprovedAt ? 'Approved' : 'Mark Content Approved'}
+                        </button>
+                        {project.contentApprovedAt && (
+                          <span className="text-xs text-gray-400">On {new Date(project.contentApprovedAt).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Revision Management */}
+                  <div className="pt-4 border-t border-gray-50">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Revision Management</h3>
+                      <button
+                        onClick={() => setWebdevForm({ ...webdevForm, showRevForm: true })}
+                        className="text-xs font-bold text-brandbook-600 hover:text-brandbook-700 flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Submit New Revision
+                      </button>
+                    </div>
+
+                    {webdevForm.showRevForm && (
+                      <div className="mb-6 p-4 bg-orange-50/50 rounded-2xl border border-orange-100 flex flex-col gap-3">
+                        <textarea
+                          placeholder="Describe the revision work performed or requested..."
+                          className="w-full px-3 py-2 border border-orange-200 rounded-xl text-sm focus:ring-orange-400 focus:outline-none"
+                          rows={3}
+                          value={webdevForm.revDesc || ''}
+                          onChange={(e) => setWebdevForm({ ...webdevForm, revDesc: e.target.value })}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => createRevisionMutation.mutate(webdevForm.revDesc)}
+                            disabled={!webdevForm.revDesc || createRevisionMutation.isPending}
+                            className="bg-orange-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-600 disabled:opacity-50"
+                          >
+                            {createRevisionMutation.isPending ? 'Posting...' : 'Post Revision'}
+                          </button>
+                          <button
+                            onClick={() => setWebdevForm({ ...webdevForm, showRevForm: false })}
+                            className="bg-white text-gray-500 px-4 py-1.5 rounded-lg text-xs font-bold border border-gray-200"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Max Revision Requests Allowed</label>
+                        <input
+                          type="number"
+                          value={webdevForm.maxRevisions}
+                          disabled={!canManage}
+                          onChange={(e) => setWebdevForm({ ...webdevForm, maxRevisions: parseInt(e.target.value) })}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+                      <div className="flex items-end pb-3">
+                        <p className="text-sm text-gray-500">
+                          Current revisions used: <span className="font-bold text-brandbook-600">{project.revisionCount || 0}</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {canManage && (
+                    <button
+                      onClick={() => updateProjectMutation.mutate({
+                        figmaLink: webdevForm.figmaLink,
+                        stagingLink: webdevForm.stagingLink,
+                        maxRevisions: webdevForm.maxRevisions,
+                      })}
+                      disabled={updateProjectMutation.isPending}
+                      className="mt-4 px-6 py-2.5 bg-brandbook-500 text-white text-sm font-bold rounded-xl hover:bg-brandbook-600 disabled:opacity-50 transition-all shadow-md shadow-brandbook-500/20"
+                    >
+                      {updateProjectMutation.isPending ? 'Saving…' : 'Save Web Dev Settings'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ───────────────── HANDOVER & SLA TAB ───────────────── */}
+            {activeTab === 'handover' && handoverForm && project && (
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <h2 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <ExternalLink className="w-5 h-5 text-brandbook-500" />
+                  Project Handover & SLA Settings
+                </h2>
+                <div className="space-y-6">
+                  <div className="pt-4">
+                    <h3 className="text-sm font-bold text-gray-900 mb-4 uppercase tracking-wider flex items-center gap-2">
+                      <Key className="w-4 h-4" /> Credentials & Training
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Credentials Transfer Link</label>
+                        <input
+                          value={handoverForm.handoverCredentials}
+                          disabled={!canManage}
+                          placeholder="https://vault.bitwarden.com/..."
+                          onChange={(e) => setHandoverForm({ ...handoverForm, handoverCredentials: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Training Slot (Date/Time)</label>
+                        <input
+                          type="datetime-local"
+                          value={handoverForm.trainingScheduledAt}
+                          disabled={!canManage}
+                          onChange={(e) => setHandoverForm({ ...handoverForm, trainingScheduledAt: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-6 border-t border-gray-50">
+                    <h3 className="text-sm font-bold text-gray-900 mb-4 uppercase tracking-wider flex items-center gap-2">
+                      <LifeBuoy className="w-4 h-4" /> Maintenance & Support (SLA)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="flex items-center gap-3 h-full pt-6">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <div
+                            className={cn(
+                              "w-10 h-6 rounded-full p-1 transition-colors duration-200 cursor-pointer",
+                              handoverForm.hasSLA ? "bg-brandbook-500" : "bg-gray-200"
+                            )}
+                            onClick={() => {
+                              if (!canManage) return;
+                              setHandoverForm({ ...handoverForm, hasSLA: !handoverForm.hasSLA });
+                            }}
+                          >
+                            <div className={cn(
+                              "w-4 h-4 bg-white rounded-full transition-transform duration-200",
+                              handoverForm.hasSLA ? "translate-x-4" : "translate-x-0"
+                            )} />
+                          </div>
+                          <span className="text-sm font-medium text-gray-700">Active SLA</span>
+                        </label>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">SLA Type</label>
+                        <select
+                          value={handoverForm.slaType}
+                          disabled={!canManage || !handoverForm.hasSLA}
+                          onChange={(e) => setHandoverForm({ ...handoverForm, slaType: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
+                        >
+                          <option value="">Select SLA Tier</option>
+                          <option value="MONTHLY">Monthly Maintenance</option>
+                          <option value="YEARLY">Yearly SLA</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">SLA Agreement Document URL</label>
+                        <input
+                          value={handoverForm.slaDocumentUrl}
+                          disabled={!canManage || !handoverForm.hasSLA}
+                          placeholder="https://link-to-sla-doc.pdf"
+                          onChange={(e) => setHandoverForm({ ...handoverForm, slaDocumentUrl: e.target.value })}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-center gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <div
+                          className={cn(
+                            "w-10 h-6 rounded-full p-1 transition-colors duration-200 cursor-pointer",
+                            handoverForm.supportSystemActive ? "bg-emerald-500" : "bg-gray-200"
+                          )}
+                          onClick={() => {
+                            if (!canManage) return;
+                            setHandoverForm({ ...handoverForm, supportSystemActive: !handoverForm.supportSystemActive });
+                          }}
+                        >
+                          <div className={cn(
+                            "w-4 h-4 bg-white rounded-full transition-transform duration-200",
+                            handoverForm.supportSystemActive ? "translate-x-4" : "translate-x-0"
+                          )} />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700">Enable Support Ticket System</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {canManage && (
+                    <button
+                      onClick={() => updateProjectMutation.mutate({
+                        handoverCredentials: handoverForm.handoverCredentials,
+                        trainingScheduledAt: handoverForm.trainingScheduledAt
+                          ? new Date(handoverForm.trainingScheduledAt)
+                          : null,
+                        hasSLA: handoverForm.hasSLA,
+                        slaType: handoverForm.slaType || null,
+                        slaDocumentUrl: handoverForm.slaDocumentUrl,
+                        supportSystemActive: handoverForm.supportSystemActive,
+                      })}
+                      disabled={updateProjectMutation.isPending}
+                      className="mt-4 px-6 py-2.5 bg-brandbook-500 text-white text-sm font-bold rounded-xl hover:bg-brandbook-600 disabled:opacity-50 transition-all shadow-md shadow-brandbook-500/20"
+                    >
+                      {updateProjectMutation.isPending ? 'Saving…' : 'Save Handover & SLA'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ───────────────── TEAM TAB ───────────────── */}
             {activeTab === 'team' && (
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <h2 className="text-base font-semibold text-gray-900 mb-4">Team Members</h2>
@@ -152,7 +642,7 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
                       {pu.role.replace('_', ' ')}
                     </span>
                     {canManage && (
-                      <button 
+                      <button
                         onClick={() => setEditingUser({ ...pu, permissions: pu.permissions || {} })}
                         className="ml-4 text-xs font-medium text-brandbook-500 hover:text-brandbook-600"
                       >
@@ -166,8 +656,7 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
                   <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl w-full max-w-2xl p-6">
                       <h2 className="text-lg font-semibold text-gray-900 mb-2">Edit Permissions: {editingUser.user?.name}</h2>
-                      <p className="text-sm text-gray-500 mb-6">Customize modules access for this user on this project. This overrides their global role limits.</p>
-                      
+                      <p className="text-sm text-gray-500 mb-6">Customize module access for this user on this project.</p>
                       <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                         {['creatives', 'approvals', 'crm', 'calendar', 'communications', 'reports', 'onboarding', 'upsell'].map(module => {
                           const currentPerms = editingUser.permissions[module] || [];
@@ -177,13 +666,13 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
                               <div className="flex gap-4">
                                 {['read', 'create', 'update', 'delete'].map(action => (
                                   <label key={action} className="flex items-center gap-2 text-sm text-gray-600">
-                                    <input 
+                                    <input
                                       type="checkbox"
                                       className="rounded border-gray-300 text-brandbook-500 focus:ring-brandbook-400"
                                       checked={currentPerms.includes(action)}
                                       onChange={(e) => {
-                                        const newPerms = e.target.checked 
-                                          ? [...currentPerms, action] 
+                                        const newPerms = e.target.checked
+                                          ? [...currentPerms, action]
                                           : currentPerms.filter((a: string) => a !== action);
                                         setEditingUser({
                                           ...editingUser,
@@ -199,20 +688,19 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
                           );
                         })}
                       </div>
-
                       <div className="flex gap-3 mt-6">
-                        <button 
-                          onClick={() => updatePermissionsMutation.mutate({ 
-                            userId: editingUser.userId, 
-                            role: editingUser.role, 
-                            permissions: editingUser.permissions 
+                        <button
+                          onClick={() => updatePermissionsMutation.mutate({
+                            userId: editingUser.userId,
+                            role: editingUser.role,
+                            permissions: editingUser.permissions
                           })}
                           disabled={updatePermissionsMutation.isPending}
                           className="flex-1 py-2.5 bg-brandbook-500 text-white font-medium rounded-lg hover:bg-brandbook-600"
                         >
                           {updatePermissionsMutation.isPending ? 'Saving...' : 'Save Permissions'}
                         </button>
-                        <button 
+                        <button
                           onClick={() => setEditingUser(null)}
                           className="flex-1 py-2.5 bg-gray-100 text-gray-600 font-medium rounded-lg hover:bg-gray-200"
                         >
@@ -225,6 +713,7 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
               </div>
             )}
 
+            {/* ───────────────── APPROVALS TAB ───────────────── */}
             {activeTab === 'approvals' && (
               <div className="space-y-4">
                 <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -236,7 +725,6 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
                       </button>
                     )}
                   </div>
-
                   {ruleList.length === 0 ? (
                     <p className="text-sm text-gray-400 text-center py-4">No approval rules configured</p>
                   ) : (
@@ -285,6 +773,7 @@ export default function ProjectSettingsPage({ params }: { params: { projectId: s
               </div>
             )}
 
+            {/* ───────────────── RULES TAB ───────────────── */}
             {activeTab === 'rules' && (
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <h2 className="text-base font-semibold text-gray-900 mb-4">Rule Engine Configurations</h2>

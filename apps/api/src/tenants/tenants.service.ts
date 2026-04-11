@@ -33,6 +33,10 @@ export class TenantsService {
         take: limit,
         include: {
           _count: { select: { tenantUsers: true, projects: true } },
+          projects: {
+            where: { isArchived: false },
+            select: { id: true, name: true, icon: true, color: true, isArchived: true },
+          },
         },
         orderBy: { createdAt: 'desc' },
       }),

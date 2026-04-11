@@ -23,12 +23,22 @@ export interface UpdateUserDto {
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(query: { role?: Role; tenantId?: string; search?: string; page?: number; limit?: number }) {
-    const { role, tenantId, search, page = 1, limit = 20 } = query;
+  async findAll(query: { role?: Role; roles?: string | string[]; tenantId?: string; search?: string; page?: number; limit?: number }) {
+    const { role, roles, tenantId, search, page = 1, limit = 20 } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    if (role) where.role = role;
+    if (role) {
+      where.role = role;
+    } else if (roles) {
+      // Support multi-role filter: ?roles=SUPER_ADMIN&roles=PROJECT_HEAD or roles: [...]
+      const rolesArray = Array.isArray(roles) ? roles : [roles];
+      if (rolesArray.length === 1) {
+        where.role = rolesArray[0];
+      } else if (rolesArray.length > 1) {
+        where.role = { in: rolesArray };
+      }
+    }
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },

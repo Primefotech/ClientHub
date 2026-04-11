@@ -95,6 +95,8 @@ export const projectsApi = {
   getDashboard: (id: string) => api.get(`/projects/${id}/dashboard`).then((r) => r.data),
   create: (data: any) => api.post('/projects', data).then((r) => r.data),
   update: (id: string, data: any) => api.patch(`/projects/${id}`, data).then((r) => r.data),
+  archive: (id: string) => api.patch(`/projects/${id}/archive`).then((r) => r.data),
+  restore: (id: string) => api.patch(`/projects/${id}/restore`).then((r) => r.data),
   delete: (id: string) => api.delete(`/projects/${id}`).then((r) => r.data),
 };
 
@@ -277,4 +279,38 @@ export const playbooksApi = {
   get: (slug: string) => api.get(`/playbooks/${slug}`).then((r) => r.data),
   upsert: (data: any) => api.post('/playbooks', data).then((r) => r.data),
   delete: (id: string) => api.delete(`/playbooks/${id}`).then((r) => r.data),
+};
+
+// ── Services ──────────────────────────────────────────────────────────────────
+export const servicesApi = {
+  list: () => api.get('/services').then((r) => r.data),
+  get: (id: string) => api.get(`/services/${id}`).then((r) => r.data),
+  create: (data: any) => api.post('/services', data).then((r) => r.data),
+  update: (id: string, data: any) => api.patch(`/services/${id}`, data).then((r) => r.data),
+  delete: (id: string) => api.delete(`/services/${id}`).then((r) => r.data),
+};
+
+// ── Project Extensions (Meetings, Tickets, Revisions) ─────────────────────────
+export const projectExtensionsApi = {
+  // Meetings
+  requestMeeting: (projectId: string, agenda: string) =>
+    api.post(`/projects/${projectId}/extensions/meetings`, { agenda }).then((r) => r.data),
+  getMeetings: (projectId: string) =>
+    api.get(`/projects/${projectId}/extensions/meetings`).then((r) => r.data),
+  updateMeeting: (projectId: string, id: string, data: any) =>
+    api.patch(`/projects/${projectId}/extensions/meetings/${id}`, data).then((r) => r.data),
+  
+  // Tickets
+  createTicket: (projectId: string, data: any) =>
+    api.post(`/projects/${projectId}/extensions/tickets`, data).then((r) => r.data),
+  getTickets: (projectId: string) =>
+    api.get(`/projects/${projectId}/extensions/tickets`).then((r) => r.data),
+  updateTicket: (projectId: string, id: string, data: any) =>
+    api.patch(`/projects/${projectId}/extensions/tickets/${id}`, data).then((r) => r.data),
+  
+  // Revisions
+  createRevision: (projectId: string, data: any) =>
+    api.post(`/projects/${projectId}/extensions/revisions`, data).then((r) => r.data),
+  getRevisions: (projectId: string) =>
+    api.get(`/projects/${projectId}/extensions/revisions`).then((r) => r.data),
 };

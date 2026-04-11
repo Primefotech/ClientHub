@@ -15,7 +15,7 @@ export class UsersController {
 
   @Get()
   @Roles(Role.SUPER_ADMIN, Role.PROJECT_HEAD)
-  findAll(@Query() query: { role?: Role; tenantId?: string; search?: string; page?: number; limit?: number }) {
+  findAll(@Query() query: { role?: Role; roles?: string | string[]; tenantId?: string; search?: string; page?: number; limit?: number }) {
     return this.usersService.findAll(query);
   }
 

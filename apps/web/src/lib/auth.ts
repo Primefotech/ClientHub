@@ -103,8 +103,21 @@ export function hasPermission(
   return allowed;
 }
 
-export function canAccessModule(user: User | null, module: string, projectId?: string): boolean {
-  return hasPermission(user, projectId, module, 'read');
+export function canAccessModule(user: User | null, module: string, projectId?: string, project?: any): boolean {
+  // First check role/permission based access
+  const hasBaseAccess = hasPermission(user, projectId, module, 'read');
+  if (!hasBaseAccess) return false;
+
+  // If project data is provided, check if the Service allows this module
+  if (project?.service) {
+    const service = project.service;
+    if (module === 'crm' && !service.hasCRM) return false;
+    if (module === 'calendar' && !service.hasCalendar) return false;
+    if (module === 'reports' && !service.hasAdReporting) return false;
+    if (module === 'webdev' && !service.hasWebDev) return false;
+  }
+
+  return true;
 }
 
 export const ROLE_LABELS: Record<string, string> = {

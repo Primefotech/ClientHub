@@ -214,7 +214,24 @@ export default function ContentTypesPage() {
               </div>
               <div className="flex gap-3 mt-8">
                 <button 
-                  onClick={() => editingType ? updateMutation.mutate({ id: editingType.id, dto: editingType }) : createMutation.mutate(newType)} 
+                  onClick={() => {
+                    if (editingType) {
+                      // Only send the fields the API accepts — strip Prisma relations
+                      const dto = {
+                        name: editingType.name,
+                        description: editingType.description,
+                        icon: editingType.icon,
+                        color: editingType.color,
+                        isGlobal: editingType.isGlobal,
+                        defaultApprovalRequired: editingType.defaultApprovalRequired,
+                        defaultAutoApprove: editingType.defaultAutoApprove,
+                        autoApproveAfterHours: editingType.autoApproveAfterHours,
+                      };
+                      updateMutation.mutate({ id: editingType.id, dto });
+                    } else {
+                      createMutation.mutate(newType);
+                    }
+                  }}
                   disabled={(editingType ? !editingType.name : !newType.name) || createMutation.isPending || updateMutation.isPending}
                   className="flex-1 py-3 bg-brandbook-500 text-white font-bold rounded-xl hover:bg-brandbook-600 disabled:opacity-50 transition-all shadow-sm active:scale-95"
                 >
