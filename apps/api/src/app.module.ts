@@ -23,7 +23,6 @@ import { SettingsModule } from './settings/settings.module';
 import { PlaybooksModule } from './playbooks/playbooks.module';
 import { ServicesModule } from './services/services.module';
 import { ProjectExtensionsModule } from './project-extensions/project-extensions.module';
-import { EventsGateway } from './gateways/events.gateway';
 
 @Module({
   imports: [
@@ -52,6 +51,6 @@ import { EventsGateway } from './gateways/events.gateway';
     ServicesModule,
     ProjectExtensionsModule,
   ],
-  providers: [EventsGateway],
+  providers: [],
 })
 export class AppModule {}

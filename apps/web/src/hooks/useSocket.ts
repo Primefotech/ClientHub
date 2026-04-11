@@ -1,58 +1,106 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
-import { io, Socket } from 'socket.io-client';
-import { getToken } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from './useAuth';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
-// In production with Nginx, NEXT_PUBLIC_WS_URL is empty — socket.io connects
-// to the same origin (yourdomain.com) which Nginx proxies to api:3001.
-// In dev it points to http://localhost:3001 directly.
-function getWsUrl(): string {
-  const envUrl = process.env.NEXT_PUBLIC_WS_URL;
-  if (envUrl) return envUrl;
-  // Fallback to current window origin (works when Nginx proxies /socket.io/)
-  if (typeof window !== 'undefined') return window.location.origin;
-  return 'http://localhost:3001';
-}
-
-let socket: Socket | null = null;
-
+/**
+ * useSocket replacement for Supabase Realtime
+ * 
+ * Instead of a persistent Socket.io connection, we use Supabase Channels:
+ * - Broadcast: for ephemeral events like 'typing'
+ * - Presence: for tracking who is online in a project
+ * - Postgres Changes: for live updates to comments, leads, etc.
+ */
 export function useSocket(projectId?: string) {
-  const socketRef = useRef<Socket | null>(null);
+  const { user } = useAuth();
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) return;
+    if (!user || !projectId) return;
 
-    if (!socket || !socket.connected) {
-      socket = io(getWsUrl(), {
-        auth: { token },
-        // Use polling first then upgrade to websocket — more reliable behind proxies
-        transports: ['polling', 'websocket'],
-        path: '/socket.io/',
+    // Create a project-specific channel
+    const channel = supabase.channel(`project:${projectId}`, {
+      config: {
+        broadcast: { self: false },
+        presence: { key: user.id },
+      },
+    });
+
+    // Subscribe to presence (tracking online users)
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        console.log('[Realtime] Presence sync:', state);
+      })
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        console.log('[Realtime] User joined:', key, newPresences);
+      })
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+        console.log('[Realtime] User left:', key, leftPresences);
       });
-    }
-    socketRef.current = socket;
 
-    if (projectId) {
-      socket.emit('join-project', projectId);
+    // Handle generic broadcast events (typing indicators, etc.)
+    // We keep the API similar to the old useSocket for compatibility
+    channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
+      // In a real app, you'd trigger a local handler here
+      console.log('[Realtime] Typing:', payload);
+    });
+
+    // Subscribe to the channel
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({
+          user_id: user.id,
+          name: user.name,
+          online_at: new Date().toISOString(),
+        });
+      }
+    });
+
+    channelRef.current = channel;
+
+    return () => {
+      channel.unsubscribe();
+      channelRef.current = null;
+    };
+  }, [user, projectId]);
+
+  // Generic handler registration (Postgres changes would be handle separately or here)
+  const on = useCallback((event: string, handler: (payload: any) => void) => {
+    if (!channelRef.current) return () => {};
+    
+    // Simple wrapper for broadcast events
+    const sub = channelRef.current.on('broadcast', { event }, ({ payload }) => handler(payload));
+    
+    // For Postgres changes, the caller should ideally use supabase.channel directly
+    // but we can add a shim if needed for 'new-comment', etc.
+    if (event === 'new-comment') {
+       supabase
+        .channel(`db-comments-${projectId}`)
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'Comment' 
+        }, payload => handler(payload.new))
+        .subscribe();
     }
 
     return () => {
-      if (projectId && socket) {
-        socket.emit('leave-project', projectId);
-      }
+      // Cleanup for broadcast is handled by unsubscribe in useEffect
     };
   }, [projectId]);
 
-  const on = useCallback((event: string, handler: (...args: any[]) => void) => {
-    socketRef.current?.on(event, handler);
-    return () => socketRef.current?.off(event, handler);
+  const emit = useCallback((event: string, payload?: any) => {
+    if (!channelRef.current) return;
+    
+    channelRef.current.send({
+      type: 'broadcast',
+      event,
+      payload,
+    });
   }, []);
 
-  const emit = useCallback((event: string, data?: any) => {
-    socketRef.current?.emit(event, data);
-  }, []);
-
-  return { on, emit, socket: socketRef.current };
+  return { on, emit, socket: channelRef.current };
 }

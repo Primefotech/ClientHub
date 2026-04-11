@@ -107,10 +107,43 @@ export default function CreativesPage({ params }: { params: { projectId: string 
   });
 
   const createMutation = useMutation({
-    mutationFn: (dto: any) => creativesApi.create(projectId, { ...dto, projectId }),
+    mutationFn: async (dto: any) => {
+      let fileUrl = dto.fileUrl;
+      
+      // If we have a file to upload
+      if (dto.file) {
+        const file = dto.file;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${projectId}/${fileName}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('creatives')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('creatives')
+          .getPublicUrl(filePath);
+        
+        fileUrl = publicUrl;
+      }
+
+      return creativesApi.create(projectId, { 
+        ...dto, 
+        fileUrl,
+        projectId 
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['creatives', projectId] });
       setShowUpload(false);
+      setNewCreative({
+        title: '', description: '', fileType: 'image', fileUrl: '',
+        contentTypeId: '', requiresApproval: true, tags: '',
+        file: null as File | null,
+      });
     },
   });
 
@@ -426,9 +459,7 @@ export default function CreativesPage({ params }: { params: { projectId: string 
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        // Mock simulating a file blob URL for display/reference
-                        const localUrl = URL.createObjectURL(file);
-                        setNewCreative({ ...newCreative, fileUrl: localUrl });
+                        setNewCreative({ ...newCreative, file });
                       }
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white file:border-0 file:bg-brandbook-50 file:text-brandbook-700 file:mr-4 file:px-4 file:py-2 file:rounded-lg hover:file:bg-brandbook-100 transition-colors cursor-pointer"
@@ -469,7 +500,7 @@ export default function CreativesPage({ params }: { params: { projectId: string 
                       tags: newCreative.tags ? newCreative.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
                     });
                   }}
-                  disabled={!newCreative.title || !newCreative.fileUrl || createMutation.isPending}
+                  disabled={!newCreative.title || !newCreative.file || createMutation.isPending}
                   className="flex-1 py-2.5 bg-brandbook-500 text-white font-medium rounded-lg hover:bg-brandbook-600 disabled:opacity-50 transition-colors"
                 >
                   {createMutation.isPending ? 'Uploading...' : 'Upload'}
